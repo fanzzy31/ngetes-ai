@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChatGPT Web Chatbot</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .chat-container {
+      background: #fff;
+      width: 100%;
+      max-width: 450px;
+      height: 90vh;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeIn 0.8s ease;
+    }
+    .chat-header {
+      background: #5f2c82;
+      color: white;
+      padding: 15px;
+      font-weight: bold;
+      text-align: center;
+      font-size: 1.3rem;
+    }
+    .chat-box {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ccc;
+      background: #f0f0f0;
+    }
+    .chat-input input {
+      flex: 1;
+      border: none;
+      padding: 12px;
+      font-size: 1rem;
+      outline: none;
+    }
+    .chat-input button {
+      background: #5f2c82;
+      color: white;
+      border: none;
+      padding: 0 20px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .chat-input button:hover {
+      background: #3d185d;
+    }
+    .message {
+      max-width: 75%;
+      padding: 10px 15px;
+      border-radius: 18px;
+      animation: slideIn 0.3s ease;
+      word-wrap: break-word;
+    }
+    .user {
+      align-self: flex-end;
+      background: #5f2c82;
+      color: white;
+    }
+    .bot {
+      align-self: flex-start;
+      background: #ececec;
+      color: black;
+    }
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(30px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+    @keyframes slideIn {
+      from {opacity: 0; transform: translateY(10px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+    @media (max-width: 500px) {
+      .chat-container {
+        border-radius: 0;
+        height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">🤖 ChatGPT Web Bot</div>
+    <div class="chat-box" id="chatBox"></div>
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Ketik pertanyaan..." />
+      <button onclick="sendMessage()">Kirim</button>
+    </div>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chatBox");
+    const userInput = document.getElementById("userInput");
+
+    window.onload = () => {
+      const history = JSON.parse(localStorage.getItem("chatHistory")) || [];
+      history.forEach(msg => addMessage(msg.sender, msg.text, false));
+    }
+
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+      addMessage("user", text);
+      userInput.value = "";
+
+      addMessage("bot", "⏳ Sedang memikirkan jawaban...");
+
+      try {
+        const reply = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await reply.json();
+        removeLastBotTyping();
+        addMessage("bot", data.reply);
+        speak(data.reply);
+      } catch (err) {
+        removeLastBotTyping();
+        addMessage("bot", "❌ Gagal menghubungi server.");
+        console.error(err);
+      }
+    }
+
+    function addMessage(sender, text, save = true) {
+      const msg = document.createElement("div");
+      msg.classList.add("message", sender);
+      msg.textContent = text;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      if (save) {
+        const history = JSON.parse(localStorage.getItem("chatHistory")) || [];
+        history.push({ sender, text });
+        localStorage.setItem("chatHistory", JSON.stringify(history));
+      }
+    }
+
+    function removeLastBotTyping() {
+      const messages = document.querySelectorAll('.message.bot');
+      const last = messages[messages.length - 1];
+      if (last && last.textContent.includes("Sedang memikirkan")) {
+        last.remove();
+      }
+    }
+
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'id-ID';
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+  </script>
+</body>
+</html>
